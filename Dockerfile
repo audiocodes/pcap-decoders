@@ -7,7 +7,11 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk add gcc \
       musl-dev \
       linux-headers \
-      pjproject-dev
+      patch \
+      pjproject-dev \
+  && mkdir -p /patches
+COPY *.patch /patches/
+RUN for patch in /patches/*.patch; do patch -p1 < $patch; done
 RUN gcc -c -O2 -DPJ_AUTOCONF pjsip-apps/src/samples/pcaputil.c
 RUN gcc -o pcaputil pcaputil.o -lpjmedia-codec -lpjmedia-audiodev -lpjmedia -lpjlib-util -lpj
 
