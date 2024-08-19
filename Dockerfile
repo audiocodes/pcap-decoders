@@ -3,7 +3,6 @@ ARG VERSION_PJSIP=2.14.1
 
 WORKDIR /pjsip
 RUN wget --no-check-certificate "https://github.com/pjsip/pjproject/archive/refs/tags/${VERSION_PJSIP}.tar.gz" -O - | tar xzf - --strip-components=1
-RUN sed -i 's:https:http:' /etc/apk/repositories
 RUN --mount=type=cache,target=/var/cache/apk \
     apk add gcc \
       musl-dev \
