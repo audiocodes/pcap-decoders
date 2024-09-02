@@ -17,13 +17,11 @@ WORKDIR /home/builder
 RUN mkdir -p .abuild packages
 RUN echo $'export JOBS=$(nproc)\n\
 export MAKEFLAGS=-j$JOBS\n\
-' > .abuild/abuild.conf
-RUN abuild-keygen -n -a
-USER root
-RUN install -d -m 775 -g abuild /var/cache/distfiles
-RUN cp -v .abuild/*.rsa.pub /etc/apk/keys/
-RUN apk -U upgrade -a
-USER builder
+' > .abuild/abuild.conf && \
+  abuild-keygen -n -a && \
+  sudo install -d -m 775 -g abuild /var/cache/distfiles && \
+  sudo cp -v .abuild/*.rsa.pub /etc/apk/keys/ && \
+  sudo apk -U upgrade -a
 
 WORKDIR /home/builder/pjproject
 COPY APKBUILD.pjproject APKBUILD
@@ -55,7 +53,9 @@ RUN make -j$(nproc) decoder
 
 FROM alpine:3.20
 ARG VERSION_PJSIP=2.14.1
-RUN --mount=type=cache,target=/var/cache/apk --mount=type=bind,from=pjsip,source=/home/builder/packages/builder,target=/pkg \
-  apk add --allow-untrusted /pkg/$(uname -m)/pjproject-${VERSION_PJSIP}*.apk
+RUN --mount=type=cache,target=/var/cache/apk --mount=type=bind,from=pjsip,source=/home/builder/packages/builder,target=/pkg-src \
+  mkdir -p /pkg && \
+  cp /pkg-src/$(uname -m)/pjproject-${VERSION_PJSIP}*.apk /pkg/ && \
+  apk add --allow-untrusted /pkg/*.apk
 COPY --from=pjsip /home/builder/pjproject/src/pjproject-${VERSION_PJSIP}/pjsip-apps/bin/samples/*/pcaputil /usr/bin
 COPY --from=silk /silk/decoder /usr/bin/silk-decoder
