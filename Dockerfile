@@ -1,18 +1,37 @@
-FROM alpine:3.20 AS pjsip
+FROM debian:bookworm-slim AS base-build
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    wget
+
+FROM base-build AS pjsip
+RUN apt-get install -y --no-install-recommends \
+    libasound2-dev \
+    libbcg729-dev \
+    libgsm1-dev \
+    libpcap-dev \
+    libsamplerate0-dev \
+    libsrtp2-dev \
+    libssl-dev \
+    libopus-dev \
+    portaudio19-dev
 
 WORKDIR /pjsip
-RUN --mount=type=cache,target=/var/cache/apk \
-    apk add gcc \
-      musl-dev \
-      linux-headers \
-      patch \
-      pjproject-dev
-RUN wget https://raw.githubusercontent.com/pjsip/pjproject/master/pjsip-apps/src/samples/pcaputil.c
-RUN gcc -c -O2 -DPJ_AUTOCONF pcaputil.c
-RUN gcc -o pcaputil pcaputil.o -lpjmedia-codec -lpjmedia-audiodev -lpjmedia -lpjlib-util -lpj
+ARG VERSION_PJSIP=2.14.1
+RUN wget "https://github.com/pjsip/pjproject/archive/refs/tags/${VERSION_PJSIP}.tar.gz" -O - | tar xzf - --strip-components=1
+COPY *.patch .
+RUN for patch in *.patch; do patch -p1 < $patch; done
+RUN ./configure --disable-shared \
+  --enable-libsamplerate \
+  --with-external-gsm \
+  --with-external-srtp \
+  --with-external-pa \
+  --disable-libwebrtc \
+  && make -j$(nproc) \
+  && strip pjsip-apps/bin/samples/*/pcaputil
 
-FROM alpine:3.20 AS silk
-
+FROM base-build AS silk
 WORKDIR /silk
 ARG TARGETPLATFORM
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
@@ -21,15 +40,22 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
       SILK_PLATFORM="FLP"; \
     fi; \
   wget 'https://github.com/audiocodes/silk/archive/refs/heads/decoder.tar.gz' -O - | tar xzf - --strip-components=2 silk-decoder/SILK_SDK_SRC_${SILK_PLATFORM}_v1.0.9
-RUN --mount=type=cache,target=/var/cache/apk \
-  apk add gcc \
-    g++ \
-    musl-dev \
-    make
 RUN make -j$(nproc) decoder
 
-FROM alpine:3.20
-RUN --mount=type=cache,target=/var/cache/apk \
-  apk add pjproject
-COPY --from=pjsip /pjsip/pcaputil /usr/bin
+FROM debian:bookworm-slim
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+  libasound2 \
+  libbcg729-0 \
+  libgsm1 \
+  libssl3 \
+  libsamplerate0 \
+  libopus0 \
+  libpcap0.8 \
+  libportaudio2 \
+  libportaudiocpp0 \
+  libsrtp2-1 \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY --from=pjsip /pjsip/pjsip-apps/bin/samples/*/pcaputil /usr/bin
 COPY --from=silk /silk/decoder /usr/bin/silk-decoder
