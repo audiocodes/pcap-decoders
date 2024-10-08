@@ -7,15 +7,13 @@ RUN apt-get update \
 
 FROM base-build AS pjsip
 RUN apt-get install -y --no-install-recommends \
-    libasound2-dev \
     libbcg729-dev \
     libgsm1-dev \
     libpcap-dev \
     libsamplerate0-dev \
     libsrtp2-dev \
     libssl-dev \
-    libopus-dev \
-    portaudio19-dev
+    libopus-dev
 
 WORKDIR /pjsip
 ARG VERSION_PJSIP=2.14.1
@@ -26,7 +24,6 @@ RUN ./configure --disable-shared \
   --enable-libsamplerate \
   --with-external-gsm \
   --with-external-srtp \
-  --with-external-pa \
   --disable-libwebrtc \
   && make -j$(nproc) \
   && strip pjsip-apps/bin/samples/*/pcaputil
@@ -45,15 +42,12 @@ RUN make -j$(nproc) decoder
 FROM debian:bookworm-slim
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-  libasound2 \
   libbcg729-0 \
   libgsm1 \
   libssl3 \
   libsamplerate0 \
   libopus0 \
   libpcap0.8 \
-  libportaudio2 \
-  libportaudiocpp0 \
   libsrtp2-1 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
