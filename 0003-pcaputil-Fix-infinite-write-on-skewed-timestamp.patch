@@ -1,0 +1,32 @@
+From 24cd0c2cdfdd23180d8b877c00c0b01a05a310de Mon Sep 17 00:00:00 2001
+From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
+Date: Thu, 7 Nov 2024 20:51:13 +0200
+Subject: [PATCH 3/3] pcaputil: Fix infinite write on skewed timestamp
+
+If a packet timestamp is *less than* the previous packet, pcaputil
+considers this a huge gap, and tries to fill it by writing endless
+blank samples.
+
+Add protection to avoid filling a gap if it is more than 10 sec.
+
+Fixes #4139
+---
+ pjsip-apps/src/samples/pcaputil.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
+index cf8e425bc..da2f3dc92 100644
+--- a/pjsip-apps/src/samples/pcaputil.c
++++ b/pjsip-apps/src/samples/pcaputil.c
+@@ -417,6 +417,8 @@ static void pcap2wav(const struct args *args)
+         /* Fill in the gap (if any) between pkt0 and pkt1 */
+         ts_gap = pj_ntohl(pkt1.rtp->ts) - pj_ntohl(pkt0.rtp->ts) -
+                  samples_cnt;
++
++        if (ts_gap < 10000) /* If gap is >10s, ignore it */
+         while (ts_gap >= (long)samples_per_frame) {
+ 
+             pcm_frame.buf = pcm;
+-- 
+2.43.0
+
