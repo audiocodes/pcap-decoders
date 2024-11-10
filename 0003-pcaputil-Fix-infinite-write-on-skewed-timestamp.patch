@@ -23,7 +23,7 @@ index cf8e425bc..da2f3dc92 100644
          ts_gap = pj_ntohl(pkt1.rtp->ts) - pj_ntohl(pkt0.rtp->ts) -
                   samples_cnt;
 +
-+        if (ts_gap < 10000) /* If gap is >10s, ignore it */
++        if (ts_gap < 30 * param.info.clock_rate) /* If gap is >10s, ignore it */
          while (ts_gap >= (long)samples_per_frame) {
  
              pcm_frame.buf = pcm;
