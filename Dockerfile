@@ -9,11 +9,11 @@ FROM base-build AS pjsip
 RUN apt-get install -y --no-install-recommends \
     libbcg729-dev \
     libgsm1-dev \
+    libopus-dev \
     libpcap-dev \
     libsamplerate0-dev \
     libsrtp2-dev \
-    libssl-dev \
-    libopus-dev
+    libssl-dev
 
 WORKDIR /pjsip
 ARG VERSION_PJSIP=2.15
@@ -42,11 +42,11 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
   libbcg729-0 \
   libgsm1 \
-  libssl3 \
-  libsamplerate0 \
   libopus0 \
   libpcap0.8 \
+  libsamplerate0 \
   libsrtp2-1 \
+  libssl3 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=pjsip /pjsip/pjsip-apps/bin/samples/*/pcaputil /usr/bin
