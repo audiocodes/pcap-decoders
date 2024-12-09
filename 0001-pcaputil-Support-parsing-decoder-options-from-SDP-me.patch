@@ -1,0 +1,88 @@
+From d7ed36364e09d952c7012fc1ebfe6651fc0c5315 Mon Sep 17 00:00:00 2001
+From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
+Date: Mon, 9 Dec 2024 11:37:37 +0200
+Subject: [PATCH] pcaputil: Support parsing decoder options from SDP media
+
+Some codecs need specific flags that are given in the SDP media
+description. For example, AMR has octet-align=1.
+
+Instead of adding a separate flag for each codec, allow pcaputil
+to accept the entire media block and parse the attributes from
+there.
+
+Example:
+pcaputil --dst-port=52422 --codec=AMR/8000 --sdp-media-desc='m=audio 52422 RTP/AVP 96 101
+c=IN IP4 1.2.3.4
+a=rtpmap:96 AMR/8000
+a=rtpmap:101 telephone-event/8000
+a=fmtp:96 mode-set=0,1,2,3,4,5,6,7;octet-align=1
+a=fmtp:101 0-15,16
+a=rtcp:52423
+a=ptime:20
+a=recvonly
+a=label:1' amr.pcap amr.wav
+---
+ pjsip-apps/src/samples/pcaputil.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
+index 0cb746c2d..d88b508f4 100644
+--- a/pjsip-apps/src/samples/pcaputil.c
++++ b/pjsip-apps/src/samples/pcaputil.c
+@@ -54,6 +54,7 @@ static const char *USAGE =
+ "                           AES_CM_128_HMAC_SHA1_80 \n"
+ "                           AES_CM_128_HMAC_SHA1_32\n"
+ "  --srtp-key=KEY, -k     Set the base64 key to decrypt SRTP packets.\n"
++"  --sdp-media-desc=SDP   Set the SDP media description for parsing codec options.\n"
+ #if PJMEDIA_HAS_OPUS_CODEC
+ "  --opus-ch=CH           Opus channel count                            \n"
+ "  --opus-clock-rate=CR   Opus clock rate                               \n"
+@@ -93,6 +94,7 @@ struct args
+     pjmedia_aud_dev_index dev_id;
+     pj_str_t srtp_crypto;
+     pj_str_t srtp_key;
++    pj_str_t sdp_media_desc;
+ #if PJMEDIA_HAS_OPUS_CODEC
+     int opus_clock_rate;
+     int opus_ch;
+@@ -338,6 +340,11 @@ static void pcap2wav(const struct args *args)
+         ci = info[0];
+     }
+     T( pjmedia_codec_mgr_get_default_param(cmgr, ci, &param) );
++    if (args->sdp_media_desc.slen > 0) {
++        pjmedia_sdp_session *sdp;
++        T( pjmedia_sdp_parse(app.pool, args->sdp_media_desc.ptr, args->sdp_media_desc.slen, &sdp) );
++        T( pjmedia_stream_info_parse_fmtp(app.pool, sdp->media[0], app.pt, &param.setting.dec_fmtp) );
++    }
+ 
+     /* Alloc and init codec */
+     T( pjmedia_codec_mgr_alloc_codec(cmgr, ci, &app.codec) );
+@@ -465,6 +472,7 @@ int main(int argc, char *argv[])
+         OPT_DST_PORT,
+         OPT_CODEC,
+         OPT_PLAY_DEV_ID,
++        OPT_SDP_MEDIA_DESC,
+ #if PJMEDIA_HAS_OPUS_CODEC
+         OPT_OPUS_CH = 'C',
+         OPT_OPUS_CLOCK_RATE = 'K',
+@@ -481,6 +489,7 @@ int main(int argc, char *argv[])
+         { "dst-port",       1, 0, OPT_DST_PORT },
+         { "codec",          1, 0, OPT_CODEC },
+         { "play-dev-id",    1, 0, OPT_PLAY_DEV_ID },
++        { "sdp-media-desc", 1, 0, OPT_SDP_MEDIA_DESC },
+ #if PJMEDIA_HAS_OPUS_CODEC
+         { "opus-ch", 1, 0, OPT_OPUS_CH },
+         { "opus-clock-rate", 1, 0, OPT_OPUS_CLOCK_RATE },
+@@ -548,6 +557,9 @@ int main(int argc, char *argv[])
+         case OPT_PLAY_DEV_ID:
+             args.dev_id = atoi(pj_optarg);
+             break;
++        case OPT_SDP_MEDIA_DESC:
++            args.sdp_media_desc = pj_str(pj_optarg);
++            break;
+ #if PJMEDIA_HAS_OPUS_CODEC
+         case OPT_OPUS_CLOCK_RATE:
+             args.opus_clock_rate = atoi(pj_optarg);
+-- 
+2.43.0
+

@@ -21,6 +21,8 @@ RUN apt-get install -y --no-install-recommends \
 WORKDIR /pjsip
 ARG VERSION_PJSIP=2.15
 RUN wget "https://github.com/pjsip/pjproject/archive/refs/tags/${VERSION_PJSIP}.tar.gz" -O - | tar xzf - --strip-components=1
+COPY *.patch .
+RUN for patch in *.patch; do patch -p1 < $patch; done
 RUN ./configure --disable-shared \
   --enable-libsamplerate \
   --with-external-gsm \
