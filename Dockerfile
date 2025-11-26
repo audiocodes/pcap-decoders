@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim AS base-build
+FROM debian:trixie-slim AS base-build
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     build-essential \
@@ -19,7 +19,7 @@ RUN apt-get install -y --no-install-recommends \
     libvo-amrwbenc-dev
 
 WORKDIR /pjsip
-ARG VERSION_PJSIP=2.15
+ARG VERSION_PJSIP=2.16
 RUN wget "https://github.com/pjsip/pjproject/archive/refs/tags/${VERSION_PJSIP}.tar.gz" -O - | tar xzf - --strip-components=1
 COPY *.patch .
 RUN for patch in *.patch; do patch -p1 < $patch; done
@@ -42,7 +42,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
   wget 'https://github.com/audiocodes/silk/archive/refs/heads/decoder.tar.gz' -O - | tar xzf - --strip-components=2 silk-decoder/SILK_SDK_SRC_${SILK_PLATFORM}_v1.0.9
 RUN make -j$(nproc) decoder
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
   libbcg729-0 \
