@@ -28,6 +28,7 @@ RUN ./configure --disable-shared \
   --with-external-gsm \
   --with-external-srtp \
   --disable-libwebrtc \
+  --disable-sound \
   && make -j$(nproc) \
   && strip pjsip-apps/bin/samples/*/pcaputil
 
