@@ -1,0 +1,30 @@
+From 2d4a131723c21226fffbae2b628f96e23c57d789 Mon Sep 17 00:00:00 2001
+From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
+Date: Sun, 14 Dec 2025 18:48:14 +0200
+Subject: [PATCH 5/5] pcaputil: Do not fill silence gap when frame timestamp
+ gap is too short
+
+Some systems have discrepancies in RTP header timestamp, while the packet
+timestamp diff is 20ms. Try to detect these cases and do not fill silence
+for them.
+---
+ pjsip-apps/src/samples/pcaputil.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
+index 0882e428c..9628baafc 100644
+--- a/pjsip-apps/src/samples/pcaputil.c
++++ b/pjsip-apps/src/samples/pcaputil.c
+@@ -467,7 +467,8 @@ static void pcap2wav(const struct args *args)
+         /* Fill in the gap (if any) between pkt0 and pkt1 */
+         ts_gap = pkt1.rtp->ts - pkt0.rtp->ts - samples_cnt;
+ 
+-        if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS) { /* Ignore gap >30s */
++        if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS && /* Ignore gap >30s */
++            (!pkt1.rtp->m || (ts_gap * 1000000000 < 2 * (pkt1.ts.u64 - pkt0.ts.u64) * param.info.clock_rate))) { /* ignore inconsistent gaps */
+             while (ts_gap >= (long)samples_per_frame) {
+                 pcm_frame.buf = pcm;
+                 pcm_frame.size = samples_per_frame * 2;
+-- 
+2.43.0
+

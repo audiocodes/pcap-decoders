@@ -1,0 +1,162 @@
+From 855fa7acbecb3e03321d0995c2ea61ed603f3b9a Mon Sep 17 00:00:00 2001
+From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
+Date: Sun, 14 Dec 2025 18:34:09 +0200
+Subject: [PATCH 3/5] pcaputil: Fill packet timestamps
+
+---
+ pjlib-util/include/pjlib-util/pcap.h | 24 ++++++++++++++++++++++++
+ pjlib-util/src/pjlib-util/pcap.c     | 19 +++++++++++++++++++
+ pjsip-apps/src/samples/pcaputil.c    | 14 +++++++-------
+ 3 files changed, 50 insertions(+), 7 deletions(-)
+
+diff --git a/pjlib-util/include/pjlib-util/pcap.h b/pjlib-util/include/pjlib-util/pcap.h
+index 4e127b049..5350acfc0 100644
+--- a/pjlib-util/include/pjlib-util/pcap.h
++++ b/pjlib-util/include/pjlib-util/pcap.h
+@@ -166,6 +166,30 @@ PJ_DECL(pj_status_t) pj_pcap_close(pj_pcap_file *file);
+ PJ_DECL(pj_status_t) pj_pcap_set_filter(pj_pcap_file *file,
+                                         const pj_pcap_filter *filter);
+ 
++/**
++ * Read UDP payload from the next packet in the PCAP file. Optionally it
++ * can return the UDP header, if caller supplies it.
++ *
++ * @param file              PCAP file handle.
++ * @param udp_hdr           Optional buffer to receive UDP header.
++ * @param udp_payload       Buffer to receive the UDP payload.
++ * @param udp_payload_size  On input, specify the size of the buffer.
++ *                          On output, it will be filled with the actual size
++ *                          of the payload as read from the packet.
++ * @param ts                Optional pointer to receive the timestamp of
++ *                          the packet in nanoseconds.
++ *
++ * @return          PJ_SUCCESS on success, or the appropriate error code.
++ */
++PJ_DECL(pj_status_t) pj_pcap_read_udp_with_timestamp(
++    pj_pcap_file *file,
++    pj_pcap_udp_hdr *udp_hdr,
++    pj_uint8_t *udp_payload,
++    pj_size_t *udp_payload_size,
++    pj_timestamp *ts
++);
++
++
+ /**
+  * Read UDP payload from the next packet in the PCAP file. Optionally it
+  * can return the UDP header, if caller supplies it.
+diff --git a/pjlib-util/src/pjlib-util/pcap.c b/pjlib-util/src/pjlib-util/pcap.c
+index 779ac1b53..935c8aa61 100644
+--- a/pjlib-util/src/pjlib-util/pcap.c
++++ b/pjlib-util/src/pjlib-util/pcap.c
+@@ -142,6 +142,8 @@ PJ_DEF(pj_status_t) pj_pcap_open(pj_pool_t *pool,
+         file->swap = PJ_TRUE;
+         file->hdr.network = pj_ntohl(file->hdr.network);
+     } else {
++        /* If we add support for nanosecond pcap, adapt timestamp handling below */
++
+         /* Not PCAP file */
+         pj_file_close(file->fd);
+         return PJ_EINVALIDOP;
+@@ -206,6 +208,19 @@ PJ_DEF(pj_status_t) pj_pcap_read_udp(pj_pcap_file *file,
+                                      pj_pcap_udp_hdr *udp_hdr,
+                                      pj_uint8_t *udp_payload,
+                                      pj_size_t *udp_payload_size)
++{
++
++    return pj_pcap_read_udp_with_timestamp(file, udp_hdr, udp_payload,
++                                           udp_payload_size, NULL);
++}
++
++PJ_DEF(pj_status_t) pj_pcap_read_udp_with_timestamp(
++    pj_pcap_file *file,
++    pj_pcap_udp_hdr *udp_hdr,
++    pj_uint8_t *udp_payload,
++    pj_size_t *udp_payload_size,
++    pj_timestamp *ts
++)
+ {
+     PJ_ASSERT_RETURN(file && udp_payload && udp_payload_size, PJ_EINVAL);
+     PJ_ASSERT_RETURN(*udp_payload_size, PJ_EINVAL);
+@@ -253,6 +268,10 @@ PJ_DEF(pj_status_t) pj_pcap_read_udp(pj_pcap_file *file,
+         }
+ 
+         rec_incl = tmp.rec.incl_len;
++        if (ts) {
++            /* If we add support for nanosecond pcap, this should be adapted accordingly */
++            ts->u64 = 1000000000ul * tmp.rec.ts_sec + 1000ul * tmp.rec.ts_usec;
++        }
+ 
+         /* Read link layer header */
+         switch (file->hdr.network) {
+diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
+index f53372278..cfa0d68e1 100644
+--- a/pjsip-apps/src/samples/pcaputil.c
++++ b/pjsip-apps/src/samples/pcaputil.c
+@@ -191,7 +191,8 @@ static int read_rtp(pj_uint8_t *buf, pj_size_t bufsize,
+                     pjmedia_rtp_hdr **rtp,
+                     pj_uint8_t **payload,
+                     unsigned *payload_size,
+-                    pj_bool_t check_pt)
++                    pj_bool_t check_pt,
++                    pj_timestamp *ts)
+ {
+     pj_status_t status;
+ 
+@@ -208,7 +209,7 @@ static int read_rtp(pj_uint8_t *buf, pj_size_t bufsize,
+         const void *p;
+         pjmedia_rtp_status seq_st;
+ 
+-        status = pj_pcap_read_udp(app.pcap, NULL, buf, &sz);
++        status = pj_pcap_read_udp_with_timestamp(app.pcap, NULL, buf, &sz, ts);
+         if (status != PJ_SUCCESS) {
+             if (status == PJ_EEOF)
+                 return PJ_FALSE;
+@@ -328,6 +329,7 @@ static void pcap2wav(const struct args *args)
+         pjmedia_rtp_hdr *rtp;
+         pj_uint8_t      *payload;
+         unsigned         payload_len;
++        pj_timestamp     ts;
+     } pkt0;
+ 
+     pjmedia_codec_mgr *cmgr;
+@@ -356,7 +358,7 @@ static void pcap2wav(const struct args *args)
+ 
+     /* Read first packet */
+     read_rtp(pkt0.buffer, sizeof(pkt0.buffer), &pkt0.rtp,
+-             &pkt0.payload, &pkt0.payload_len, PJ_FALSE);
++             &pkt0.payload, &pkt0.payload_len, PJ_FALSE, &pkt0.ts);
+ 
+     cmgr = pjmedia_endpt_get_codec_mgr(app.mept);
+ 
+@@ -420,7 +422,6 @@ static void pcap2wav(const struct args *args)
+     /* Loop reading PCAP and writing WAV file */
+     for (;;) {
+         struct pkt pkt1;
+-        pj_timestamp ts;
+         pjmedia_frame frames[16], pcm_frame;
+         short pcm[PJMEDIA_MAX_MTU];
+         unsigned i, frame_cnt;
+@@ -429,10 +430,9 @@ static void pcap2wav(const struct args *args)
+         pj_assert(sizeof(pcm) >= samples_per_frame);
+ 
+         /* Parse first packet */
+-        ts.u64 = 0;
+         frame_cnt = PJ_ARRAY_SIZE(frames);
+         T( pjmedia_codec_parse(app.codec, pkt0.payload, pkt0.payload_len,
+-                                &ts, &frame_cnt, frames) );
++                                &pkt0.ts, &frame_cnt, frames) );
+ 
+         /* Decode and write to WAV file */
+         samples_cnt = 0;
+@@ -453,7 +453,7 @@ static void pcap2wav(const struct args *args)
+ 
+         /* Read next packet */
+         if (!read_rtp(pkt1.buffer, sizeof(pkt1.buffer), &pkt1.rtp,
+-                      &pkt1.payload, &pkt1.payload_len, PJ_TRUE)) {
++                      &pkt1.payload, &pkt1.payload_len, PJ_TRUE, &pkt1.ts)) {
+             break;
+         }
+ 
+-- 
+2.43.0
+

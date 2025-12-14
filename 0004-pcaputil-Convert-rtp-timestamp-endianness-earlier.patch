@@ -1,0 +1,40 @@
+From 71bc3846b432dc1675d93a9fa214690002fb4f91 Mon Sep 17 00:00:00 2001
+From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
+Date: Sun, 14 Dec 2025 18:39:41 +0200
+Subject: [PATCH 4/5] pcaputil: Convert rtp timestamp endianness earlier
+
+---
+ pjsip-apps/src/samples/pcaputil.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
+index cfa0d68e1..0882e428c 100644
+--- a/pjsip-apps/src/samples/pcaputil.c
++++ b/pjsip-apps/src/samples/pcaputil.c
+@@ -279,6 +279,13 @@ static int read_rtp(pj_uint8_t *buf, pj_size_t bufsize,
+ 
+ 
+         *rtp = (pjmedia_rtp_hdr*)r;
++#if PJ_IS_LITTLE_ENDIAN
++        /* seq and ssrc are unused here, so don't waste cpu cycles for them
++        (*rtp)->seq = ntohs((*rtp)->seq);
++        (*rtp)->ssrc = ntohl((*rtp)->ssrc);
++        */
++        (*rtp)->ts = ntohl((*rtp)->ts);
++#endif
+         *payload = (pj_uint8_t*)p;
+ 
+         /* We have good packet */
+@@ -458,8 +465,7 @@ static void pcap2wav(const struct args *args)
+         }
+ 
+         /* Fill in the gap (if any) between pkt0 and pkt1 */
+-        ts_gap = pj_ntohl(pkt1.rtp->ts) - pj_ntohl(pkt0.rtp->ts) -
+-                 samples_cnt;
++        ts_gap = pkt1.rtp->ts - pkt0.rtp->ts - samples_cnt;
+ 
+         if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS) { /* Ignore gap >30s */
+             while (ts_gap >= (long)samples_per_frame) {
+-- 
+2.43.0
+

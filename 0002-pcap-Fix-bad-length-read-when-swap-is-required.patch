@@ -1,0 +1,34 @@
+From f39767cb9646af0185b88e296beb8aa88fa10bff Mon Sep 17 00:00:00 2001
+From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
+Date: Sun, 14 Dec 2025 17:35:40 +0200
+Subject: [PATCH 2/5] pcap: Fix bad length read when swap is required
+
+---
+ pjlib-util/src/pjlib-util/pcap.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/pjlib-util/src/pjlib-util/pcap.c b/pjlib-util/src/pjlib-util/pcap.c
+index 4fd136b1f..779ac1b53 100644
+--- a/pjlib-util/src/pjlib-util/pcap.c
++++ b/pjlib-util/src/pjlib-util/pcap.c
+@@ -244,8 +244,6 @@ PJ_DEF(pj_status_t) pj_pcap_read_udp(pj_pcap_file *file,
+             return status;
+         }
+ 
+-        rec_incl = tmp.rec.incl_len;
+-
+         /* Swap byte ordering */
+         if (file->swap) {
+             tmp.rec.incl_len = pj_ntohl(tmp.rec.incl_len);
+@@ -254,6 +252,8 @@ PJ_DEF(pj_status_t) pj_pcap_read_udp(pj_pcap_file *file,
+             tmp.rec.ts_usec = pj_ntohl(tmp.rec.ts_usec);
+         }
+ 
++        rec_incl = tmp.rec.incl_len;
++
+         /* Read link layer header */
+         switch (file->hdr.network) {
+         case PJ_PCAP_LINK_TYPE_ETH:
+-- 
+2.43.0
+
