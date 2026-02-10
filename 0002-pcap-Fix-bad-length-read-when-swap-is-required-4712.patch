@@ -1,7 +1,7 @@
-From f39767cb9646af0185b88e296beb8aa88fa10bff Mon Sep 17 00:00:00 2001
+From c6c0ce72300b53a114489751b56c04cf1a0ddd96 Mon Sep 17 00:00:00 2001
 From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
-Date: Sun, 14 Dec 2025 17:35:40 +0200
-Subject: [PATCH 2/5] pcap: Fix bad length read when swap is required
+Date: Mon, 15 Dec 2025 05:51:26 +0200
+Subject: [PATCH 2/7] pcap: Fix bad length read when swap is required (#4712)
 
 ---
  pjlib-util/src/pjlib-util/pcap.c | 4 ++--

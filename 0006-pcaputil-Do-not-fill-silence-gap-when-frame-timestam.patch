@@ -1,27 +1,33 @@
-From 2d4a131723c21226fffbae2b628f96e23c57d789 Mon Sep 17 00:00:00 2001
+From 515d6cb6fdbc6a948121e58c37e36584c1090934 Mon Sep 17 00:00:00 2001
 From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
 Date: Sun, 14 Dec 2025 18:48:14 +0200
-Subject: [PATCH 5/5] pcaputil: Do not fill silence gap when frame timestamp
+Subject: [PATCH 6/7] pcaputil: Do not fill silence gap when frame timestamp
  gap is too short
 
 Some systems have discrepancies in RTP header timestamp, while the packet
 timestamp diff is 20ms. Try to detect these cases and do not fill silence
 for them.
 ---
- pjsip-apps/src/samples/pcaputil.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ pjsip-apps/src/samples/pcaputil.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
-index 0882e428c..9628baafc 100644
+index d0b060ff9..64ab58230 100644
 --- a/pjsip-apps/src/samples/pcaputil.c
 +++ b/pjsip-apps/src/samples/pcaputil.c
-@@ -467,7 +467,8 @@ static void pcap2wav(const struct args *args)
+@@ -467,7 +467,14 @@ static void pcap2wav(const struct args *args)
          /* Fill in the gap (if any) between pkt0 and pkt1 */
          ts_gap = pkt1.rtp->ts - pkt0.rtp->ts - samples_cnt;
  
 -        if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS) { /* Ignore gap >30s */
-+        if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS && /* Ignore gap >30s */
-+            (!pkt1.rtp->m || (ts_gap * 1000000000 < 2 * (pkt1.ts.u64 - pkt0.ts.u64) * param.info.clock_rate))) { /* ignore inconsistent gaps */
++        /* Skip gap-filling if gap exceeds 30s, or if the marker bit is
++         * set but the RTP gap exceeds 2x the wall-clock gap (indicating a
++         * timestamp discontinuity rather than a real pause).
++         */
++        if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS &&
++            (!pkt1.rtp->m ||
++             ((pj_int64_t)ts_gap * 1000000000LL <
++              2 * (pj_int64_t)(pkt1.ts.u64 - pkt0.ts.u64) * param.info.clock_rate))) {
              while (ts_gap >= (long)samples_per_frame) {
                  pcm_frame.buf = pcm;
                  pcm_frame.size = samples_per_frame * 2;

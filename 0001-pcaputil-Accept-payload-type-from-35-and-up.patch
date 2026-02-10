@@ -1,7 +1,7 @@
-From 3c54d6287e51c768e4642e9c303bcdd3999089ce Mon Sep 17 00:00:00 2001
+From 71d4a369321f15e98ee5fef45284aba0a9675fea Mon Sep 17 00:00:00 2001
 From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
 Date: Wed, 11 Dec 2024 14:18:14 +0200
-Subject: [PATCH 1/5] pcaputil: Accept payload type from 35 and up
+Subject: [PATCH 1/7] pcaputil: Accept payload type from 35 and up
 
 ---
  pjsip-apps/src/samples/pcaputil.c | 2 +-

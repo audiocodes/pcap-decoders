@@ -1,14 +1,14 @@
-From 71bc3846b432dc1675d93a9fa214690002fb4f91 Mon Sep 17 00:00:00 2001
+From bf8860a6886dd2ec6afb0501374c6a20da3b1d35 Mon Sep 17 00:00:00 2001
 From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
-Date: Sun, 14 Dec 2025 18:39:41 +0200
-Subject: [PATCH 4/5] pcaputil: Convert rtp timestamp endianness earlier
+Date: Tue, 10 Feb 2026 11:04:22 +0200
+Subject: [PATCH 5/7] pcaputil: Convert rtp timestamp endianness earlier
 
 ---
  pjsip-apps/src/samples/pcaputil.c | 10 ++++++++--
  1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
-index cfa0d68e1..0882e428c 100644
+index 6cc3164e7..d0b060ff9 100644
 --- a/pjsip-apps/src/samples/pcaputil.c
 +++ b/pjsip-apps/src/samples/pcaputil.c
 @@ -279,6 +279,13 @@ static int read_rtp(pj_uint8_t *buf, pj_size_t bufsize,

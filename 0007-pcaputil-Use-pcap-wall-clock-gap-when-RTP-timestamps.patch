@@ -1,0 +1,59 @@
+From 2895785cb753e169ea1f8930dcf6277adcd911e7 Mon Sep 17 00:00:00 2001
+From: Orgad Shaneh <orgad.shaneh@audiocodes.com>
+Date: Tue, 10 Feb 2026 15:37:29 +0200
+Subject: [PATCH 7/7] pcaputil: Use pcap wall-clock gap when RTP timestamps
+ understate pause
+
+When the marker bit indicates a new talkspurt, RTP timestamps may not
+reflect the actual pause duration (e.g. during hold). If the pcap
+wall-clock gap exceeds the RTP timestamp gap by more than 150ms (a
+jitter buffer to tolerate clock drift and network jitter), substitute
+the wall-clock gap so silence is filled correctly.
+---
+ pjsip-apps/src/samples/pcaputil.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/pjsip-apps/src/samples/pcaputil.c b/pjsip-apps/src/samples/pcaputil.c
+index 64ab58230..cdd1cdf9c 100644
+--- a/pjsip-apps/src/samples/pcaputil.c
++++ b/pjsip-apps/src/samples/pcaputil.c
+@@ -426,6 +426,11 @@ static void pcap2wav(const struct args *args)
+         err_exit("invalid output file", PJ_EINVAL);
+     }
+ 
++    /* Minimum wall-clock excess over RTP gap to trigger adjustment (150ms),
++     * pre-scaled for the comparison: 150ms * clock_rate * 1e9 / 1000.
++     */
++    const pj_int64_t min_marker_gap_diff = 150 * param.info.clock_rate * 1000000;
++
+     /* Loop reading PCAP and writing WAV file */
+     for (;;) {
+         struct pkt pkt1;
+@@ -467,6 +472,24 @@ static void pcap2wav(const struct args *args)
+         /* Fill in the gap (if any) between pkt0 and pkt1 */
+         ts_gap = pkt1.rtp->ts - pkt0.rtp->ts - samples_cnt;
+ 
++        /* When the RTP marker bit is set (start of a talkspurt after
++         * silence/hold), RTP timestamps may not reflect the actual pause
++         * duration. If the real wall-clock gap (from pcap timestamps)
++         * exceeds the RTP timestamp gap by more than 150ms (a jitter
++         * buffer to tolerate clock drift and network jitter), use the
++         * wall-clock gap instead so that silence is correctly filled.
++         *
++         * Comparison (avoiding division):
++         *   ts_gap/clock_rate + 150ms < pcap_ns_gap / 1e9
++         *   => ts_gap * 1e9 + 150ms * clock_rate * 1e9 < pcap_ns_gap * clock_rate
++         */
++        if (pkt1.rtp->m &&
++            ((pj_int64_t)ts_gap * 1000000000LL + min_marker_gap_diff <
++             (pj_int64_t)(pkt1.ts.u64 - pkt0.ts.u64) * param.info.clock_rate))
++        {
++            ts_gap = (pkt1.ts.u64 - pkt0.ts.u64) * param.info.clock_rate / 1000000000;
++        }
++
+         /* Skip gap-filling if gap exceeds 30s, or if the marker bit is
+          * set but the RTP gap exceeds 2x the wall-clock gap (indicating a
+          * timestamp discontinuity rather than a real pause).
+-- 
+2.43.0
+
